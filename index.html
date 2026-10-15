@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>XAUUSD Drawdown Calculator</title>
+<meta name="description" content="Kalkulator drawdown & profit TP basket untuk strategi averaging XAUUSD.">
+<meta name="theme-color" content="#0f141c">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="XAU DD">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--text:#1a1f2b;--mute:#667085;--line:#e3e6eb;--gold:#c99700;--red:#d92d20;--green:#12805c;--inp:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#0f141c;--card:#171e29;--text:#e8ebf0;--mute:#8b95a5;--line:#263040;--gold:#f0b90b;--red:#ff6b64;--green:#3ddc97;--inp:#0f141c}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.wrap{max-width:720px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+header img{width:44px;height:44px;border-radius:10px}
+h1{font-size:19px;margin:0}header p{margin:0;color:var(--mute);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.card h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 10px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:block;font-size:12px;color:var(--mute);margin-bottom:3px}
+input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--inp);color:var(--text);font:inherit}
+input:focus,select:focus{outline:2px solid var(--gold);border-color:transparent}
+.full{grid-column:1/-1}
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.box{border:1px solid var(--line);border-radius:12px;padding:12px}
+.box small{color:var(--mute);display:block;font-size:12px}
+.box b{font-size:21px;display:block;margin-top:2px;word-break:break-word}
+.dd b{color:var(--red)}.pf b{color:var(--green)}
+.rows div{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.rows div:last-child{border:0}.rows span{color:var(--mute)}.rows strong{text-align:right}
+.warn{color:var(--red)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}th{color:var(--mute);font-weight:600}
+tr.cur td{background:rgba(240,185,11,.14);font-weight:700}
+.scroll{overflow-x:auto}
+.note{font-size:12px;color:var(--mute);margin:8px 0 0}
+button{padding:9px 14px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--text);font:inherit;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><img src="icons/icon-192.png" alt=""><div><h1>XAUUSD Drawdown Calculator</h1><p>Drawdown di posisi ke-x &amp; profit bila TP basket</p></div></header>
+
+<div class="card">
+<h2>Posisi target</h2>
+<div class="grid">
+<div class="full"><label for="x">Hitung sampai posisi ke- (x)</label><input id="x" type="number" inputmode="numeric" min="1" max="4500" value="30"></div>
+</div>
+</div>
+
+<div class="card">
+<h2>Pengaturan EA</h2>
+<div class="grid">
+<div><label for="lot0">Initial lot</label><input id="lot0" type="number" inputmode="decimal" step="0.01" min="0.01" value="0.01"></div>
+<div><label for="mult">Lot multiplier</label><input id="mult" type="number" inputmode="decimal" step="0.01" min="1.01" value="1.2"></div>
+<div><label for="grp">Posisi per grup lot</label><input id="grp" type="number" inputmode="numeric" min="1" value="30"></div>
+<div><label for="maxlot">Max lot per order (0 = bebas)</label><input id="maxlot" type="number" inputmode="decimal" step="0.01" min="0" value="0"></div>
+<div><label for="step">Jarak averaging (pips)</label><input id="step" type="number" inputmode="decimal" min="0.1" value="30"></div>
+<div><label for="tp">Take profit basket (pips)</label><input id="tp" type="number" inputmode="decimal" min="0" value="100"></div>
+<div><label for="pipsize">Nilai 1 pip XAUUSD</label>
+<select id="pipsize"><option value="0.01">0,01 (sesuai EA)</option><option value="0.1">0,10 (konvensi umum)</option></select></div>
+<div><label for="acc">Tipe akun</label>
+<select id="acc"><option value="1">Standard (USD)</option><option value="100">Cent (USC)</option></select></div>
+<div><label for="dir">Arah</label><select id="dir"><option value="buy">BUY</option><option value="sell">SELL</option></select></div>
+<div><label for="vstep">Volume step broker</label><input id="vstep" type="number" inputmode="decimal" step="0.01" min="0.01" value="0.01"></div>
+</div>
+<p class="note">Rumus lot &amp; jarak mengikuti EA Tunggak Semi: level ke-n berjarak (n-1) × jarak averaging dari posisi pertama.</p>
+</div>
+
+<div class="card">
+<h2>Opsional: harga, balance &amp; margin</h2>
+<div class="grid">
+<div><label for="price">Harga entry pertama</label><input id="price" type="number" inputmode="decimal" step="0.01" placeholder="mis. 4000.00"></div>
+<div><label for="bal">Balance (mata uang akun)</label><input id="bal" type="number" inputmode="decimal" placeholder="mis. 1000"></div>
+<div><label for="lev">Leverage (1:x)</label><input id="lev" type="number" inputmode="numeric" value="500"></div>
+<div><label for="so">Stop out level (%)</label><input id="so" type="number" inputmode="decimal" value="50"></div>
+</div>
+</div>
+
+<div class="card">
+<h2>Hasil di posisi ke-<span id="xl">30</span></h2>
+<div class="hero">
+<div class="box dd"><small>Drawdown floating</small><b id="r-dd">-</b></div>
+<div class="box pf"><small>Profit bila TP basket</small><b id="r-pf">-</b></div>
+</div>
+<div class="rows" style="margin-top:8px" id="rows"></div>
+</div>
+
+<div class="card">
+<h2>Lot per grup</h2>
+<div class="scroll"><table id="tg"></table></div>
+</div>
+
+<div class="card">
+<h2>Perbandingan antar posisi</h2>
+<div class="scroll"><table id="tc"></table></div>
+<p class="note">Drawdown dihitung saat posisi tersebut baru terisi (harga tepat di levelnya), tanpa spread, swap, dan komisi.</p>
+</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const IDS=['x','lot0','mult','grp','maxlot','step','tp','pipsize','acc','dir','vstep','price','bal','lev','so'];
+const CONTRACT=100; // 1 lot XAUUSD = 100 oz
+const fmt=(n,d=2)=>n.toLocaleString('id-ID',{minimumFractionDigits:d,maximumFractionDigits:d});
+const num=(id,def=0)=>{const v=parseFloat($(id).value);return isFinite(v)?v:def};
+
+// Meniru BuildLotSequence() & GetLotSize() pada EA
+function lotSeq(lot0,mult,vs){
+  mult=Math.max(mult,1.01);
+  const r=v=>Math.round(v/vs)*vs, first=r(lot0), seq=[first,first];
+  let raw=lot0;
+  for(let k=0;k<2000&&seq.length<150;k++){
+    const v=r(raw);
+    if(v>seq[seq.length-1]+vs/2)seq.push(v);
+    raw*=mult;
+  }
+  return seq;
+}
+function calc(p,x){
+  const seq=lotSeq(p.lot0,p.mult,p.vs);
+  const lotAt=i=>{
+    let g=Math.min(Math.floor((i-1)/p.grp),seq.length-1),l=seq[g];
+    if(p.maxlot>0&&l>p.maxlot)l=p.maxlot;
+    return Math.max(+(Math.round(l/p.vs)*p.vs).toFixed(2),0.01);
+  };
+  const pv=CONTRACT*p.pipsize*p.acc; // nilai 1 pip per 1 lot
+  let sumL=0,sumLd=0,ddLot=0;
+  const out=[];
+  for(let i=1;i<=x;i++){
+    const L=lotAt(i),d=(i-1)*p.step;
+    sumL+=L;sumLd+=L*d;
+    const P=d; // harga posisi i berada di offset d dari anchor
+    ddLot=P*sumL-sumLd; // sum L_j*(P-d_j)
+    out.push({i,L,sumL,dd:ddLot*pv,avg:sumLd/sumL,P});
+  }
+  const last=out[x-1],profit=last.sumL*p.tp*pv;
+  return {seq,lotAt,pv,out,last,profit,rebound:(last.P-last.avg)+p.tp};
+}
+function read(){
+  return {lot0:num('lot0',.01),mult:num('mult',1.2),grp:Math.max(1,Math.floor(num('grp',30))),maxlot:num('maxlot'),
+    step:num('step',30),tp:num('tp',100),pipsize:num('pipsize',.01),acc:num('acc',1),vs:num('vstep',.01)||.01};
+}
+function render(){
+  const p=read(),x=Math.min(4500,Math.max(1,Math.floor(num('x',1))));
+  const cur=p.acc===100?'USC':'USD',buy=$('dir').value==='buy',sgn=buy?-1:1;
+  const R=calc(p,x),L=R.last;
+  $('xl').textContent=x;
+  $('r-dd').textContent='-'+fmt(L.dd)+' '+cur;
+  $('r-pf').textContent='+'+fmt(R.profit)+' '+cur;
+  const rows=[
+    ['Total lot terbuka',fmt(L.sumL)+' lot'],
+    ['Lot posisi ke-'+x,fmt(R.lotAt(x))+' lot'],
+    ['Jarak dari posisi pertama',fmt(L.P,0)+' pips ('+fmt(L.P*p.pipsize)+' harga)'],
+    ['Average price (dari anchor)',fmt(L.avg,1)+' pips ('+fmt(L.avg*p.pipsize)+' harga)'],
+    ['Rebound dibutuhkan ke TP',fmt(R.rebound,1)+' pips ('+fmt(R.rebound*p.pipsize)+' harga)'],
+    ['Profit : Drawdown',L.dd>0?'1 : '+fmt(L.dd/R.profit):'-']
+  ];
+  const price=num('price',NaN);
+  if(isFinite(price)&&price>0){
+    const px=price+sgn*L.P*p.pipsize,avgP=price+sgn*L.avg*p.pipsize,tpP=avgP-sgn*p.tp*p.pipsize;
+    rows.push(['Harga posisi ke-'+x,fmt(px)],['Average price',fmt(avgP)],['Harga TP basket',fmt(tpP)]);
+    const lev=num('lev',0),bal=num('bal',NaN);
+    if(lev>0){
+      const m=L.sumL*CONTRACT*px/lev*p.acc;
+      rows.push(['Margin terpakai',fmt(m)+' '+cur]);
+      if(isFinite(bal)&&bal>0){
+        const eq=bal-L.dd,ml=eq/m*100,so=num('so',50);
+        rows.push(['Equity saat itu',fmt(eq)+' '+cur],['Margin level',(ml<so?'<span class="warn">':'<span>')+fmt(ml)+'%</span>'],
+          ['Drawdown % balance',fmt(L.dd/bal*100)+'%']);
+        if(ml<so)rows.push(['Status','<span class="warn">Di bawah stop out!</span>']);
+      }
+    }
+  }
+  $('rows').innerHTML=rows.map(r=>'<div><span>'+r[0]+'</span><strong>'+r[1]+'</strong></div>').join('');
+  // tabel grup lot
+  let g='<tr><th>Grup</th><th>Posisi</th><th>Lot</th></tr>';
+  const ng=Math.min(R.seq.length,Math.ceil(x/p.grp)+1);
+  for(let k=0;k<ng;k++){
+    const a=k*p.grp+1,b=(k+1)*p.grp;
+    g+='<tr'+(x>=a&&x<=b?' class="cur"':'')+'><td>'+(k+1)+'</td><td>'+a+'–'+b+'</td><td>'+fmt(Math.min(p.maxlot>0?p.maxlot:1e9,R.seq[k]))+'</td></tr>';
+  }
+  $('tg').innerHTML=g+'';
+  // tabel perbandingan
+  const stride=Math.max(10,Math.ceil(x/30/10)*10),pts=[];
+  for(let i=stride;i<x;i+=stride)pts.push(i);pts.push(x);
+  let t='<tr><th>Posisi</th><th>Total lot</th><th>Drawdown</th><th>Profit TP</th></tr>';
+  pts.forEach(i=>{const o=R.out[i-1];
+    t+='<tr'+(i===x?' class="cur"':'')+'><td>'+i+'</td><td>'+fmt(o.sumL)+'</td><td>-'+fmt(o.dd)+'</td><td>+'+fmt(o.sumL*p.tp*R.pv)+'</td></tr>';});
+  $('tc').innerHTML=t;
+}
+// simpan input
+try{const s=JSON.parse(localStorage.getItem('xaudd')||'{}');IDS.forEach(k=>{if(s[k]!==undefined)$(k).value=s[k]})}catch(e){}
+IDS.forEach(k=>$(k).addEventListener('input',()=>{
+  try{const s={};IDS.forEach(i=>s[i]=$(i).value);localStorage.setItem('xaudd',JSON.stringify(s))}catch(e){}
+  render();
+}));
+render();
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+</script>
+</body>
+</html>
