@@ -44,6 +44,11 @@ th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--line);white
 th:first-child,td:first-child{text-align:left}th{color:var(--mute);font-weight:600}
 tr.cur td{background:rgba(240,185,11,.14);font-weight:700}
 .scroll{overflow-x:auto}
+details{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;overflow:hidden}
+summary{cursor:pointer;padding:10px 12px;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸";color:var(--gold)}details[open]>summary::before{content:"▾"}
+summary b{min-width:92px}summary span{color:var(--mute);font-size:12px}summary em{font-style:normal;color:var(--red);font-weight:600}
 .note{font-size:12px;color:var(--mute);margin:8px 0 0}
 button{padding:9px 14px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--text);font:inherit;cursor:pointer}
 </style>
@@ -70,8 +75,6 @@ button{padding:9px 14px;border:1px solid var(--line);border-radius:9px;backgroun
 <div><label for="tp">Take profit basket (pips)</label><input id="tp" type="number" inputmode="decimal" min="0" value="100"></div>
 <div><label for="pipsize">Nilai 1 pip XAUUSD</label>
 <select id="pipsize"><option value="0.01">0,01 (sesuai EA)</option><option value="0.1">0,10 (konvensi umum)</option></select></div>
-<div><label for="acc">Tipe akun</label>
-<select id="acc"><option value="1">Standard (USD)</option><option value="100">Cent (USC)</option></select></div>
 <div><label for="dir">Arah</label><select id="dir"><option value="buy">BUY</option><option value="sell">SELL</option></select></div>
 <div><label for="vstep">Volume step broker</label><input id="vstep" type="number" inputmode="decimal" step="0.01" min="0.01" value="0.01"></div>
 </div>
@@ -82,7 +85,7 @@ button{padding:9px 14px;border:1px solid var(--line);border-radius:9px;backgroun
 <h2>Opsional: harga, balance &amp; margin</h2>
 <div class="grid">
 <div><label for="price">Harga entry pertama</label><input id="price" type="number" inputmode="decimal" step="0.01" placeholder="mis. 4000.00"></div>
-<div><label for="bal">Balance (mata uang akun)</label><input id="bal" type="number" inputmode="decimal" placeholder="mis. 1000"></div>
+<div><label for="bal">Balance (USC)</label><input id="bal" type="number" inputmode="decimal" placeholder="mis. 1000"></div>
 <div><label for="lev">Leverage (1:x)</label><input id="lev" type="number" inputmode="numeric" value="500"></div>
 <div><label for="so">Stop out level (%)</label><input id="so" type="number" inputmode="decimal" value="50"></div>
 </div>
@@ -98,20 +101,15 @@ button{padding:9px 14px;border:1px solid var(--line);border-radius:9px;backgroun
 </div>
 
 <div class="card">
-<h2>Lot per grup</h2>
-<div class="scroll"><table id="tg"></table></div>
-</div>
-
-<div class="card">
-<h2>Perbandingan antar posisi</h2>
-<div class="scroll"><table id="tc"></table></div>
-<p class="note">Drawdown dihitung saat posisi tersebut baru terisi (harga tepat di levelnya), tanpa spread, swap, dan komisi.</p>
+<h2>Breakdown per posisi (buka per grup)</h2>
+<div id="bd"></div>
+<p class="note">Drawdown dihitung saat posisi tersebut baru terisi (harga tepat di levelnya); profit TP = total lot × TP pips. Tanpa spread, swap, dan komisi.</p>
 </div>
 </div>
 
 <script>
 const $=id=>document.getElementById(id);
-const IDS=['x','lot0','mult','grp','maxlot','step','tp','pipsize','acc','dir','vstep','price','bal','lev','so'];
+const IDS=['x','lot0','mult','grp','maxlot','step','tp','pipsize','dir','vstep','price','bal','lev','so'];
 const CONTRACT=100; // 1 lot XAUUSD = 100 oz
 const fmt=(n,d=2)=>n.toLocaleString('id-ID',{minimumFractionDigits:d,maximumFractionDigits:d});
 const num=(id,def=0)=>{const v=parseFloat($(id).value);return isFinite(v)?v:def};
@@ -150,11 +148,11 @@ function calc(p,x){
 }
 function read(){
   return {lot0:num('lot0',.01),mult:num('mult',1.2),grp:Math.max(1,Math.floor(num('grp',30))),maxlot:num('maxlot'),
-    step:num('step',30),tp:num('tp',100),pipsize:num('pipsize',.01),acc:num('acc',1),vs:num('vstep',.01)||.01};
+    step:num('step',30),tp:num('tp',100),pipsize:num('pipsize',.01),acc:1,vs:num('vstep',.01)||.01};
 }
 function render(){
   const p=read(),x=Math.min(4500,Math.max(1,Math.floor(num('x',1))));
-  const cur=p.acc===100?'USC':'USD',buy=$('dir').value==='buy',sgn=buy?-1:1;
+  const cur='USC',buy=$('dir').value==='buy',sgn=buy?-1:1;
   const R=calc(p,x),L=R.last;
   $('xl').textContent=x;
   $('r-dd').textContent='-'+fmt(L.dd)+' '+cur;
@@ -187,21 +185,19 @@ function render(){
     }
   }
   $('rows').innerHTML=rows.map(r=>'<div><span>'+r[0]+'</span><strong>'+r[1]+'</strong></div>').join('');
-  // tabel grup lot
-  let g='<tr><th>Grup</th><th>Posisi</th><th>Lot</th></tr>';
-  const ng=Math.min(R.seq.length,Math.ceil(x/p.grp)+1);
+  // breakdown per grup (accordion)
+  const hasP=isFinite(price)&&price>0,ng=Math.ceil(x/p.grp);
+  let h='';
   for(let k=0;k<ng;k++){
-    const a=k*p.grp+1,b=(k+1)*p.grp;
-    g+='<tr'+(x>=a&&x<=b?' class="cur"':'')+'><td>'+(k+1)+'</td><td>'+a+'–'+b+'</td><td>'+fmt(Math.min(p.maxlot>0?p.maxlot:1e9,R.seq[k]))+'</td></tr>';
+    const a=k*p.grp+1,e=Math.min(x,(k+1)*p.grp),eo=R.out[e-1],isCur=x>=a&&x<=e;
+    h+='<details'+(isCur?' open':'')+'><summary><b>Grup '+(k+1)+'</b><span>Posisi '+a+'–'+e+'</span><span>'+fmt(R.lotAt(a))+' lot/posisi</span><span>DD akhir grup: <em>-'+fmt(eo.dd)+'</em></span></summary><div class="scroll"><table><tr><th>Posisi</th><th>Lot</th><th>Jarak (pips)</th>'+(hasP?'<th>Harga</th>':'')+'<th>Total lot</th><th>Drawdown</th><th>Profit TP</th></tr>';
+    for(let i=a;i<=e;i++){
+      const o=R.out[i-1];
+      h+='<tr'+(i===x?' class="cur"':'')+'><td>'+i+'</td><td>'+fmt(o.L)+'</td><td>'+fmt(o.P,0)+'</td>'+(hasP?'<td>'+fmt(price+sgn*o.P*p.pipsize)+'</td>':'')+'<td>'+fmt(o.sumL)+'</td><td>-'+fmt(o.dd)+'</td><td>+'+fmt(o.sumL*p.tp*R.pv)+'</td></tr>';
+    }
+    h+='</table></div></details>';
   }
-  $('tg').innerHTML=g+'';
-  // tabel perbandingan
-  const stride=Math.max(10,Math.ceil(x/30/10)*10),pts=[];
-  for(let i=stride;i<x;i+=stride)pts.push(i);pts.push(x);
-  let t='<tr><th>Posisi</th><th>Total lot</th><th>Drawdown</th><th>Profit TP</th></tr>';
-  pts.forEach(i=>{const o=R.out[i-1];
-    t+='<tr'+(i===x?' class="cur"':'')+'><td>'+i+'</td><td>'+fmt(o.sumL)+'</td><td>-'+fmt(o.dd)+'</td><td>+'+fmt(o.sumL*p.tp*R.pv)+'</td></tr>';});
-  $('tc').innerHTML=t;
+  $('bd').innerHTML=h;
 }
 // simpan input
 try{const s=JSON.parse(localStorage.getItem('xaudd')||'{}');IDS.forEach(k=>{if(s[k]!==undefined)$(k).value=s[k]})}catch(e){}
