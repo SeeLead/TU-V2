@@ -53,9 +53,9 @@ button{padding:9px 14px;border:1px solid var(--line);border-radius:9px;backgroun
 <header><img src="icons/icon-192.png" alt=""><div><h1>XAUUSD Drawdown Calculator</h1><p>Drawdown di posisi ke-x &amp; profit bila TP basket</p></div></header>
 
 <div class="card">
-<h2>Posisi target</h2>
+<h2>Jumlah posisi terbuka</h2>
 <div class="grid">
-<div class="full"><label for="x">Hitung sampai posisi ke- (x)</label><input id="x" type="number" inputmode="numeric" min="1" max="4500" value="30"></div>
+<div class="full"><label for="x">Saat ada berapa posisi terbuka?</label><input id="x" type="number" inputmode="numeric" min="1" max="4500" value="100"></div>
 </div>
 </div>
 
@@ -89,9 +89,9 @@ button{padding:9px 14px;border:1px solid var(--line);border-radius:9px;backgroun
 </div>
 
 <div class="card">
-<h2>Hasil di posisi ke-<span id="xl">30</span></h2>
+<h2>Hasil saat <span id="xl">30</span> posisi terbuka</h2>
 <div class="hero">
-<div class="box dd"><small>Drawdown floating</small><b id="r-dd">-</b></div>
+<div class="box dd"><small>Drawdown (posisi ke-x baru terisi)</small><b id="r-dd">-</b></div>
 <div class="box pf"><small>Profit bila TP basket</small><b id="r-pf">-</b></div>
 </div>
 <div class="rows" style="margin-top:8px" id="rows"></div>
@@ -161,16 +161,19 @@ function render(){
   $('r-pf').textContent='+'+fmt(R.profit)+' '+cur;
   const rows=[
     ['Total lot terbuka',fmt(L.sumL)+' lot'],
-    ['Lot posisi ke-'+x,fmt(R.lotAt(x))+' lot'],
+    ['Lot posisi terakhir (ke-'+x+')',fmt(R.lotAt(x))+' lot'],
     ['Jarak dari posisi pertama',fmt(L.P,0)+' pips ('+fmt(L.P*p.pipsize)+' harga)'],
     ['Average price (dari anchor)',fmt(L.avg,1)+' pips ('+fmt(L.avg*p.pipsize)+' harga)'],
     ['Rebound dibutuhkan ke TP',fmt(R.rebound,1)+' pips ('+fmt(R.rebound*p.pipsize)+' harga)'],
     ['Profit : Drawdown',L.dd>0?'1 : '+fmt(L.dd/R.profit):'-']
   ];
+  const ddN=L.dd+L.sumL*p.step*R.pv;
+  rows.splice(0,0,['Drawdown terdalam sebelum posisi ke-'+(x+1)+' terbuka','<span class="warn">-'+fmt(ddN)+' '+cur+'</span>'],
+    ['Rebound ke TP dari titik itu',fmt(R.rebound+p.step,1)+' pips']);
   const price=num('price',NaN);
   if(isFinite(price)&&price>0){
     const px=price+sgn*L.P*p.pipsize,avgP=price+sgn*L.avg*p.pipsize,tpP=avgP-sgn*p.tp*p.pipsize;
-    rows.push(['Harga posisi ke-'+x,fmt(px)],['Average price',fmt(avgP)],['Harga TP basket',fmt(tpP)]);
+    rows.push(['Harga saat posisi ke-'+x+' terisi',fmt(px)],['Harga sesaat sebelum posisi ke-'+(x+1),fmt(px+sgn*p.step*p.pipsize)],['Average price',fmt(avgP)],['Harga TP basket',fmt(tpP)]);
     const lev=num('lev',0),bal=num('bal',NaN);
     if(lev>0){
       const m=L.sumL*CONTRACT*px/lev*p.acc;
